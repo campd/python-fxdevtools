@@ -203,7 +203,10 @@ class Front(object):
     cb(packet)
 
 def gotProtocol(p):
-  return FirefoxDevtoolsClient(p)
+  d = defer.Deferred()
+  client = FirefoxDevtoolsClient(p)
+  client.onConnected += lambda _: d.callback(client)
+  return d
 
 def connect(hostname="localhost", port=6080):
   point = TCP4ClientEndpoint(reactor, hostname, port)
