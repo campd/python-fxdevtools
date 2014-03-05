@@ -64,28 +64,56 @@ def getType(t) :
   if t in registeredTypes:
     return registeredTypes[t]
 
-  raise Error("Oops I haven't finished implementing getType")
+  pieces = t.split(":", 1)
 
-def identityWrite(v):
-  if v == None:
-    raise Error("None passed where a value is required")
-  return v
+  if pieces.len > 1:
+    collection, subtype = pieces
+    if collection == "nullable":
+      return addType(NullableType(subtype))
+
+    raise ValueError("Unknown collection type: " + collection)
+
+  raise ValueError("Unknown type: " + type)
+
 
 class ProtocolType(object):
+  pass
+
+class PrimitiveType(ProtocolType):
   def __init__(self, name, read=None, write=None):
     self.name = name
-    self.primitive = read == None and write == None
-    self.read = read or identityWrite
-    self.write = write or identityWrite
 
-def addType(name, read=None, write=None):
-  t = ProtocolType(name, read, write)
-  registeredTypes[name] = t
+  def read(self, v, ctx=None):
+    if v == None:
+      raise Error("None passed where a value is required")
+    return v
+
+  def write(self, v, ctx=None):
+    if v == None:
+      raise Error("None passed where a value is required")
+    return v
+
+class NullableType(ProtocolType):
+  def __init__(self, subtype):
+    self.subtype = getType(subtype)
+    self.name = "nullable:" + name
+
+  def read(self, v, ctx=None):
+    if v == None:
+      return v
+    return self.subtype.read(v, ctx)
+
+  def write(self, v, ctx=None):
+    if v == None:
+      return v
+    return self.subtype.write(v, ctx)
+
+def addType(t):
+  registeredTypes[t.name] = t
   return t
 
-Primitive = addType("primitive")
-String = addType("string")
-Number = addType("number")
-Boolean = addType("boolean")
-JSON = addType("json")
+String = addType(PrimitiveType("string"))
+Number = addType(PrimitiveType("number"))
+Boolean = addType(PrimitiveType("boolean"))
+JSON = addType(PrimitiveType("json"))
 
