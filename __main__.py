@@ -1,6 +1,9 @@
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
+from twisted.internet.defer import setDebugging
 
 from fxdevtools.protocol import connect
+
+setDebugging(True)
 
 def done(packet):
   print packet
@@ -11,4 +14,9 @@ def connected(client):
 
 d = connect()
 d.addCallback(connected)
+
+def errback(e):
+  print "ERRBACK: %s" % (e,)
+d.addErrback(errback)
+
 reactor.run()
