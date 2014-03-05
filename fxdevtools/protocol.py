@@ -3,10 +3,9 @@ from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
 from twisted.internet import reactor, defer
 
 from events import Event
-from marshallers import getType, Request, Response
+from marshallers import addType, getType, Request, Response, ActorType, DictType
 
 import json
-
 
 class FirefoxDevtoolsProtocol(Protocol):
   def __init__(self):
@@ -21,14 +20,12 @@ class FirefoxDevtoolsProtocol(Protocol):
     except ValueError:
       return
 
-
     length = int(length)
     if len(remaining) < length:
       return
 
     packet = remaining[0:length]
     self.buffer = remaining[length:]
-
     self.onPacket.emit(json.loads(packet))
 
   def sendPacket(self, packet):
@@ -70,7 +67,8 @@ class FirefoxDevtoolsClient(object):
 
       from fronts import RootFront
       self.root = RootFront(self, packet)
-      self.onConnected.emit(self)
+      d = self.root.actorDescriptions()
+      d.addCallback(self.registerActorDescriptions)
       return
 
     if packet["from"] == "root":
@@ -79,6 +77,14 @@ class FirefoxDevtoolsClient(object):
       front = self.getFront(packet["from"])
 
     front.onPacket(packet)
+
+  def registerActorDescriptions(self, descriptions):
+
+    print "descriptions: %s" % (json.dumps(descriptions, indent=2),)
+    for t in descriptions["types"]:
+      if t["category"] == "dict":
+        addType(DictType(t["name"], t["specializations"]))
+    self.onConnected.emit(self)
 
   def sendPacket(self, packet):
     self.conn.sendPacket(packet)
@@ -89,7 +95,10 @@ class Pool(object):
     self.conn = conn
 
   def parent():
-    return this.conn.poolFor(self.actorID)
+    return self.conn.poolFor(self.actorID)
+
+  def marshallPool():
+    return self
 
   def fronts(self):
     try:
@@ -142,6 +151,9 @@ class Method(object):
 
 class FrontMeta(type):
   def __init__(cls, name, parents, dct):
+    if "typeName" in dct:
+      addType(ActorType(dct["typeName"], cls))
+
     if "actorDesc" in dct:
       cls.implementActor(dct["actorDesc"])
 

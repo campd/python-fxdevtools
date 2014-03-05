@@ -11,6 +11,7 @@ class Request(object):
       self.template["type"] = self.name
 
   def __call__(self, *args, **kwargs):
+    print "calling..."
     return self.__convert(self.template, args, kwargs)
 
   def __convert(self, template, args, kwargs):
@@ -83,12 +84,12 @@ class PrimitiveType(ProtocolType):
   def __init__(self, name, read=None, write=None):
     self.name = name
 
-  def read(self, v, ctx=None):
+  def read(self, v, ctx=None, detail=None):
     if v == None:
       raise Error("None passed where a value is required")
     return v
 
-  def write(self, v, ctx=None):
+  def write(self, v, ctx=None, detail=None):
     if v == None:
       raise Error("None passed where a value is required")
     return v
@@ -98,15 +99,81 @@ class NullableType(ProtocolType):
     self.subtype = getType(subtype)
     self.name = "nullable:" + name
 
-  def read(self, v, ctx=None):
+  def read(self, v, ctx=None, detail=None):
     if v == None:
       return v
     return self.subtype.read(v, ctx)
 
-  def write(self, v, ctx=None):
+  def write(self, v, ctx=None, detail=None):
     if v == None:
       return v
     return self.subtype.write(v, ctx)
+
+class ArrayType(ProtocolType):
+  def __init__(self, subtype):
+    self.subtype = getType(subtype)
+    self.name = "array:" + subtype.name
+
+  def read(self, v, ctx=None, detail=None):
+    if isinstance(self.subtype, PrimitiveType):
+      return v
+    return [subtype.read(i, ctx, detail) for i in v]
+
+  def write(self, v, ctx=None, detail=None):
+    if isinstance(self.subtype, PrimitiveType):
+      return v
+    return [subtype.write(i, ctx, detail) for i in v]
+
+class DictType(ProtocolType):
+  def __init__(self, name, specializations):
+    self.name = name
+    self.specializations = specializations
+
+  def read(self, v, ctx=None, detail=None):
+    ret = {}
+    for prop in v.keys():
+      if prop in self.specializations:
+        ret[prop] = getType(self.specializations[prop]).read(v[prop], ctx, detail)
+      else:
+        ret[prop] = v[prop]
+    return ret
+
+  def write(self, v, ctx=None, detail=None):
+    ret = {}
+    for prop in v.keys():
+      if prop in self.specializations:
+        ret[prop] = getType(self.specializations[prop]).write(v[prop], ctx, detail)
+      else:
+        ret[prop] = v[prop]
+    return ret
+
+  def write(self, v, ctx=None, detail=None):
+    pass
+
+class ActorType(ProtocolType):
+  def __init__(self, name, cls):
+    self.name = name
+    self.cls = cls
+
+  def read(self, v, ctx=None, detail=None):
+    if isinstance(v, str):
+      actorID = v
+    else:
+      actorID = v.actorID
+
+    front = ctx.conn.getFront(actorID)
+    if not front:
+      front = cls(ctx.conn)
+      front.actorID = actorID
+      front.form(v, detail)
+      ctx.marshallPool().manage(front)
+
+    front.form(v, detail, ctx)
+
+    return front
+
+  def write(self, v, ctx=None, detail=None):
+    return v.actorID
 
 def addType(t):
   registeredTypes[t.name] = t
