@@ -1,3 +1,7 @@
+"""
+Front specializations
+"""
+
 from protocol import Front, Request
 from marshallers import getType
 

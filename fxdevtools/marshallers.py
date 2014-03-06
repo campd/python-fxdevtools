@@ -215,6 +215,9 @@ def addType(t):
   registeredTypes[t.name] = t
   return t
 
+def typeExists(name):
+  return name in registeredTypes
+
 Primitive = addType(PrimitiveType("primitive"))
 String = addType(PrimitiveType("string"))
 Number = addType(PrimitiveType("number"))

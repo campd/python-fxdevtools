@@ -3,7 +3,7 @@ from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
 from twisted.internet import reactor, defer
 
 from events import Event
-from marshallers import addType, getType, Request, Response, ActorType, DictType, PlaceholderType
+from marshallers import addType, getType, typeExists, Request, Response, ActorType, DictType, PlaceholderType
 
 import json
 
@@ -69,6 +69,7 @@ class FirefoxDevtoolsClient(object):
       self.root = RootFront(self, packet)
       d = self.root.actorDescriptions()
       d.addCallback(self.registerActorDescriptions)
+      d.addErrback(self.describeFailed)
       return
 
     if packet["from"] == "root":
@@ -78,12 +79,16 @@ class FirefoxDevtoolsClient(object):
 
     front.onPacket(packet)
 
+  def describeFailed(self, e):
+    print "Error listing actor descriptions: %s" % (e,)
+    import protodesc
+    self.registerActorDescriptions(protodesc.actorDescriptions)
+
   def registerActorDescriptions(self, descriptions):
     for desc in descriptions["types"].values():
-      if desc["category"] == "dict":
-        addType(DictType(desc["typeName"], desc["specializations"]))
-      if desc["category"] == "actor":
-        typeName = desc["typeName"]
+      typeName = desc["typeName"]
+      category = desc["category"]
+      if category == "actor":
         t = getType(desc["typeName"])
 
         if isinstance(t, ActorType):
@@ -94,6 +99,13 @@ class FirefoxDevtoolsClient(object):
           concrete = type(str(typeName), (Front,), { "typeName": typeName })
 
         concrete.implementActor(desc)
+        continue
+
+      if typeExists(typeName):
+        continue
+
+      if category == "dict":
+        addType(DictType(typeName, desc["specializations"]))
 
     self.onConnected.emit(self)
 
@@ -214,6 +226,10 @@ class Front(Pool):
 
     d = defer.Deferred()
     def finish(responsePacket):
+      if "error" in responsePacket:
+        d.errback(responsePacket)
+        return
+
       d.callback(method.response(self, responsePacket))
     self.requests.append(finish)
 
