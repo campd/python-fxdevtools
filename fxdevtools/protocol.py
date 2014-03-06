@@ -79,22 +79,21 @@ class FirefoxDevtoolsClient(object):
     front.onPacket(packet)
 
   def registerActorDescriptions(self, descriptions):
-    for t in descriptions["types"]:
-      if t["category"] == "dict":
-        addType(DictType(t["name"], t["specializations"]))
+    for desc in descriptions["types"].values():
+      if desc["category"] == "dict":
+        addType(DictType(desc["typeName"], desc["specializations"]))
+      if desc["category"] == "actor":
+        typeName = desc["typeName"]
+        t = getType(desc["typeName"])
 
-    for desc in descriptions["actors"].values():
-      typeName = desc["typeName"]
-      t = getType(desc["typeName"])
+        if isinstance(t, ActorType):
+          concrete = t.cls
+        elif isinstance(t, PlaceholderType) and t.concrete:
+          concrete = t.concrete.cls
+        else:
+          concrete = type(str(typeName), (Front,), { "typeName": typeName })
 
-      if isinstance(t, ActorType):
-        concrete = t.cls
-      elif isinstance(t, PlaceholderType) and t.concrete:
-        concrete = t.concrete.cls
-      else:
-        concrete = type(str(typeName), (Front,), { "typeName": typeName })
-
-      concrete.implementActor(desc)
+        concrete.implementActor(desc)
 
     self.onConnected.emit(self)
 
