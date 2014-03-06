@@ -14,12 +14,21 @@ def connected(client):
   d = defer.waitForDeferred(client.root.echo("hello"))
   yield d
   print "echo result: " + d.getResult()
+  d = defer.waitForDeferred(client.root.listTabs())
+  yield d
+
+  tabs = d.getResult()
+
+  d = defer.waitForDeferred(tabs[0].inspector.getWalker())
+  yield d
+  print "walker: %s" % (d.getResult(),)
+
 
 d = connect()
 d.addCallback(connected)
 
 def errback(e):
-  print "ERRBACK: %s" % (e,)
+  print "ERROR: %s" % (e,)
 d.addErrback(errback)
 
 reactor.run()

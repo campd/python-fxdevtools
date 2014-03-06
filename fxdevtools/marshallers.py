@@ -10,18 +10,17 @@ class Request(object):
     if not "type" in self.template:
       self.template["type"] = self.name
 
-  def __call__(self, *args, **kwargs):
-    print "calling..."
-    return self.__convert(self.template, args, kwargs)
+  def __call__(self, ctx, *args, **kwargs):
+    return self.__convert(self.template, ctx, args, kwargs)
 
-  def __convert(self, template, args, kwargs):
+  def __convert(self, template, ctx, args, kwargs):
     if isinstance(template, dict) and "_arg" in template:
       t = getType(template["type"])
-      return t.write(args[template["_arg"]])
+      return t.write(args[template["_arg"]], ctx)
     elif isinstance(template, dict):
-      return {name: self.__convert(template[name], args, kwargs) for name in template}
+      return {name: self.__convert(template[name], ctx, args, kwargs) for name in template}
     elif isinstance(template, list) or isinstance(template, tuple):
-      return [self.__convert(item, args, kwargs) for item in template]
+      return [self.__convert(item, ctx, args, kwargs) for item in template]
 
     return template
 
@@ -29,13 +28,19 @@ class Response(object):
   """Reads a response packet given a response template."""
 
   def __init__(self, template):
-    self.path, t = self.__findResponse(template, [])
-    self.type = getType(t)
+    response = self.__findResponse(template, [])
+    if response:
+      self.path, t = response
+      self.type = getType(t)
+    else:
+      self.path = None
 
-  def __call__(self, packet):
+  def __call__(self, ctx, packet):
+    if self.path == None:
+      return None
     for p in self.path:
       packet = packet[p]
-    return self.type.read(packet)
+    return self.type.read(packet, ctx)
 
   def __findResponse(self, template, path):
     if isinstance(template, dict) and "_retval" in template:
@@ -59,7 +64,7 @@ def getType(t) :
   if t == None:
     return Primitive
 
-  if not isinstance(t, str):
+  if not isinstance(t, str) and not isinstance(t, unicode):
     return t
 
   if t in registeredTypes:
@@ -67,15 +72,21 @@ def getType(t) :
 
   pieces = t.split(":", 1)
 
-  if pieces.len > 1:
+  if len(pieces) > 1:
     collection, subtype = pieces
     if collection == "nullable":
       return addType(NullableType(subtype))
+    if collection == "array":
+      return addType(ArrayType(subtype))
 
     raise ValueError("Unknown collection type: " + collection)
 
-  raise ValueError("Unknown type: " + type)
+  pieces = t.split("#", 1)
+  if len(pieces) > 1:
+    return addType(ActorDetailType(t, pieces[0], pieces[1]))
 
+  # I think I'm going to regret this.
+  return addType(PlaceholderType(t))
 
 class ProtocolType(object):
   pass
@@ -97,7 +108,7 @@ class PrimitiveType(ProtocolType):
 class NullableType(ProtocolType):
   def __init__(self, subtype):
     self.subtype = getType(subtype)
-    self.name = "nullable:" + name
+    self.name = "nullable:" + self.subtype.name
 
   def read(self, v, ctx=None, detail=None):
     if v == None:
@@ -112,17 +123,17 @@ class NullableType(ProtocolType):
 class ArrayType(ProtocolType):
   def __init__(self, subtype):
     self.subtype = getType(subtype)
-    self.name = "array:" + subtype.name
+    self.name = "array:" + self.subtype.name
 
   def read(self, v, ctx=None, detail=None):
     if isinstance(self.subtype, PrimitiveType):
       return v
-    return [subtype.read(i, ctx, detail) for i in v]
+    return [self.subtype.read(i, ctx, detail) for i in v]
 
   def write(self, v, ctx=None, detail=None):
     if isinstance(self.subtype, PrimitiveType):
       return v
-    return [subtype.write(i, ctx, detail) for i in v]
+    return [self.subtype.write(i, ctx, detail) for i in v]
 
 class DictType(ProtocolType):
   def __init__(self, name, specializations):
@@ -156,29 +167,55 @@ class ActorType(ProtocolType):
     self.cls = cls
 
   def read(self, v, ctx=None, detail=None):
-    if isinstance(v, str):
+    if isinstance(v, str) or isinstance(v, unicode):
       actorID = v
     else:
-      actorID = v.actorID
+      actorID = v["actor"]
 
     front = ctx.conn.getFront(actorID)
     if not front:
-      front = cls(ctx.conn)
+      front = self.cls(ctx.conn)
       front.actorID = actorID
-      front.form(v, detail)
       ctx.marshallPool().manage(front)
 
-    front.form(v, detail, ctx)
+    front.form(v, detail)
 
     return front
 
   def write(self, v, ctx=None, detail=None):
     return v.actorID
 
+class ActorDetailType(ProtocolType):
+  def __init__(self, actorType, detail):
+    self.subtype = getType(actorType)
+    self.detail = detail
+
+  def read(self, v, ctx=None):
+    return self.subtype.read(v, ctx, self.detail)
+
+  def write(self, v, ctx=None):
+    return self.subtype.write(v, ctx, self.detail)
+
+class PlaceholderType(ProtocolType):
+  def __init__(self, name):
+    self.name = name
+    self.concrete = None
+
+  def __getattr__(self, name):
+    return getattr(self.concrete, name)
+
 def addType(t):
+  if t.name in registeredTypes:
+    registered = registeredTypes[t.name]
+    if registered.concrete:
+      raise ValueError("Type %s registered twice!" % (t.name,))
+    registered.concrete = t
+    return registered
+
   registeredTypes[t.name] = t
   return t
 
+Primitive = addType(PrimitiveType("primitive"))
 String = addType(PrimitiveType("string"))
 Number = addType(PrimitiveType("number"))
 Boolean = addType(PrimitiveType("boolean"))

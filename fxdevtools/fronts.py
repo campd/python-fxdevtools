@@ -1,4 +1,5 @@
 from protocol import Front, Request
+from marshallers import getType
 
 
 class RootFront(Front):
@@ -17,15 +18,14 @@ class RootFront(Front):
       "name": "listTabs",
       "request": {},
       "response": {
-        "tabs": { "_retval": "json" }
+        "tabs": { "_retval": "array:tab" }
       }
     },
     {
       "name": "actorDescriptions",
       "request": {},
       "response": { "_retval": "json" }
-    }
-    ]
+    }]
   }
 
   def __init__(self, conn, packet):
@@ -45,14 +45,7 @@ class TabFront(Front):
     self.conn = conn
 
   def form(self, form, detail=None):
-    self.actorID = form.actor
+    self.actorID = form["actor"]
+    self.inspector = getType("inspector").read(form["inspectorActor"], self)
 
-class InspectorFront(Front):
-  typeName = "inspector"
-
-  def __init__(self, conn):
-    self.conn = conn
-
-  def form(self, form, detail=None):
-    self.actorID = form
 

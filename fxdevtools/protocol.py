@@ -3,7 +3,7 @@ from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
 from twisted.internet import reactor, defer
 
 from events import Event
-from marshallers import addType, getType, Request, Response, ActorType, DictType
+from marshallers import addType, getType, Request, Response, ActorType, DictType, PlaceholderType
 
 import json
 
@@ -50,7 +50,7 @@ class FirefoxDevtoolsClient(object):
   def poolFor(self, actorID):
     for pool in self.pools:
       if pool.hasFront(actorID):
-        return pool.getFront(actorID)
+        return pool
     return None
 
   def getFront(self, actorID):
@@ -79,16 +79,27 @@ class FirefoxDevtoolsClient(object):
     front.onPacket(packet)
 
   def registerActorDescriptions(self, descriptions):
-
-    print "descriptions: %s" % (json.dumps(descriptions, indent=2),)
     for t in descriptions["types"]:
       if t["category"] == "dict":
         addType(DictType(t["name"], t["specializations"]))
+
+    for desc in descriptions["actors"].values():
+      typeName = desc["typeName"]
+      t = getType(desc["typeName"])
+
+      if isinstance(t, ActorType):
+        concrete = t.cls
+      elif isinstance(t, PlaceholderType) and t.concrete:
+        concrete = t.concrete.cls
+      else:
+        concrete = type(str(typeName), (Front,), { "typeName": typeName })
+
+      concrete.implementActor(desc)
+
     self.onConnected.emit(self)
 
   def sendPacket(self, packet):
     self.conn.sendPacket(packet)
-
 
 class Pool(object):
   def __init__(conn):
@@ -97,9 +108,10 @@ class Pool(object):
   def parent():
     return self.conn.poolFor(self.actorID)
 
-  def marshallPool():
+  def marshallPool(self):
     return self
 
+  @property
   def fronts(self):
     try:
       return self._fronts
@@ -116,7 +128,7 @@ class Pool(object):
     """Remove an actor as a child of this pool"""
     del self.fronts[front.actorID]
 
-  def has(self, actorID):
+  def hasFront(self, actorID):
     return actorID in self.fronts
 
   def isEmpty(self):
@@ -159,12 +171,12 @@ class FrontMeta(type):
 
     return super(FrontMeta, cls).__init__(name, parents, dct)
 
-class Front(object):
+class Front(Pool):
   __metaclass__ = FrontMeta
 
   @classmethod
   def implementActor(cls, actorDesc):
-    if isinstance(actorDesc, str):
+    if isinstance(actorDesc, str) or isinstance(actorDesc, unicode):
       actorDesc = json.loads(s)
 
     for method in actorDesc["methods"]:
@@ -190,16 +202,20 @@ class Front(object):
       impl = "impl_%s" % (name,)
       if hasattr(self, impl):
         return getattr(self, impl)
-    raise AttributError
+
+    raise AttributeError("'%s' object has no attribute named '%s'" % (self.__class__.__name__, name))
+
+  def form(self, form, detail=None):
+    pass
 
   def request(self, method, *args, **kwargs):
-    packet = method.request(*args, **kwargs)
+    packet = method.request(self, *args, **kwargs)
     packet["to"] = self.actorID
     self.conn.sendPacket(packet)
 
     d = defer.Deferred()
     def finish(responsePacket):
-      d.callback(method.response(responsePacket))
+      d.callback(method.response(self, responsePacket))
     self.requests.append(finish)
 
     return d
@@ -208,7 +224,6 @@ class Front(object):
     # XXX: pick off event packets
 
     if len(self.requests) == 0:
-      print "UNEXPECTED PACKET: " + json.dumps(packet)
       return
 
     cb = self.requests.pop(0)
