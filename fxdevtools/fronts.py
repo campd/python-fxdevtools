@@ -2,10 +2,18 @@
 Front specializations
 """
 
+print "importing fronts"
+
 from protocol import Front, Request
-from marshallers import getType
+from marshallers import getType, addType, DictType
+
+addType(DictType("tablist", {
+  "selected": "number",
+  "tabs": "array:tab"
+}))
 
 
+print "ABOUT TO CREATE ROOTFRONT"
 class RootFront(Front):
   typeName = "root"
   actorDesc = {
@@ -21,9 +29,7 @@ class RootFront(Front):
     {
       "name": "listTabs",
       "request": {},
-      "response": {
-        "tabs": { "_retval": "array:tab" }
-      }
+      "response": { "_retval": "tablist" }
     },
     {
       "name": "actorDescriptions",
@@ -38,6 +44,7 @@ class RootFront(Front):
     super(RootFront, self).__init__(conn)
 
 
+print "ABOUT TO CREATE TABFRONT"
 class TabFront(Front):
   typeName = "tab"
   actorDesc = {
@@ -51,5 +58,8 @@ class TabFront(Front):
   def form(self, form, detail=None):
     self.actorID = form["actor"]
     self.inspector = getType("inspector").read(form["inspectorActor"], self)
+    for name in form.keys():
+      setattr(self, name, form[name])
 
-
+  def formData(key):
+    return self._form[key]

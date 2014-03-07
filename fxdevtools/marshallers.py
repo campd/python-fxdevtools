@@ -18,7 +18,10 @@ class Request(object):
       t = getType(template["type"])
       return t.write(args[template["_arg"]], ctx)
     elif isinstance(template, dict):
-      return {name: self.__convert(template[name], ctx, args, kwargs) for name in template}
+      ret = {}
+      for name in template:
+        ret[name] = self.__convert(template[name], ctx, args, kwargs)
+      return ret
     elif isinstance(template, list) or isinstance(template, tuple):
       return [self.__convert(item, ctx, args, kwargs) for item in template]
 
@@ -202,12 +205,14 @@ class PlaceholderType(ProtocolType):
     self.concrete = None
 
   def __getattr__(self, name):
+    if not self.concrete:
+      raise ValueError("No concrete type registered for %s!" % (self.name,))
     return getattr(self.concrete, name)
 
 def addType(t):
   if t.name in registeredTypes:
     registered = registeredTypes[t.name]
-    if registered.concrete:
+    if not isinstance(registered, PlaceholderType) or registered.concrete:
       raise ValueError("Type %s registered twice!" % (t.name,))
     registered.concrete = t
     return registered

@@ -19,7 +19,7 @@ def connected(client):
 
   tabs = d.getResult()
 
-  d = defer.waitForDeferred(tabs[0].inspector.getWalker())
+  d = defer.waitForDeferred(tabs["tabs"][tabs["selected"]].inspector.getWalker())
   yield d
   print "walker: %s" % (d.getResult(),)
 

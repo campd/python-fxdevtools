@@ -1,5 +1,4 @@
-from twisted.internet.protocol import Protocol
-from twisted.internet.endpoints import TCP4ClientEndpoint, connectProtocol
+from twisted.internet.protocol import Protocol, Factory, ClientCreator
 from twisted.internet import reactor, defer
 
 from events import Event
@@ -26,10 +25,12 @@ class FirefoxDevtoolsProtocol(Protocol):
 
     packet = remaining[0:length]
     self.buffer = remaining[length:]
+    print "got " + packet
     self.onPacket.emit(json.loads(packet))
 
   def sendPacket(self, packet):
     data = json.dumps(packet)
+    print "sending " + data
     self.transport.write(str(len(data)) + ":" + data)
 
 
@@ -64,6 +65,7 @@ class FirefoxDevtoolsClient(object):
       # Yeah these should be runtime errors.
       assert packet["from"] == "root"
       assert "applicationType" in packet
+
 
       from fronts import RootFront
       self.root = RootFront(self, packet)
@@ -174,7 +176,9 @@ class Method(object):
 
 class FrontMeta(type):
   def __init__(cls, name, parents, dct):
+    print "registering class " + name
     if "typeName" in dct:
+      print "adding type " + dct["typeName"]
       addType(ActorType(dct["typeName"], cls))
 
     if "actorDesc" in dct:
@@ -251,7 +255,9 @@ def gotProtocol(p):
   return d
 
 def connect(hostname="localhost", port=6080):
-  point = TCP4ClientEndpoint(reactor, hostname, port)
-  d = connectProtocol(point, FirefoxDevtoolsProtocol())
+  creator = ClientCreator(reactor, FirefoxDevtoolsProtocol)
+  d = creator.connectTCP(hostname, port)
   d.addCallback(gotProtocol)
   return d
+
+import fronts
