@@ -27,16 +27,11 @@ class Request(object):
 
     return template
 
-class Response(object):
-  """Reads a response packet given a response template."""
-
-  def __init__(self, template):
-    response = self.__findResponse(template, [])
-    if response:
-      self.path, t = response
-      self.type = getType(t)
-    else:
-      self.path = None
+class ReadPath(object):
+  def __init__(self, path=None, t=None):
+    if path != None:
+      self.path = [p for p in path]
+    self.type = getType(t)
 
   def __call__(self, ctx, packet):
     if self.path == None:
@@ -45,9 +40,75 @@ class Response(object):
       packet = packet[p]
     return self.type.read(packet, ctx)
 
+
+class ProtocolEvent(object):
+  def __init__(self, name, template):
+    self.name = name
+
+    propName = "on"
+    pieces = name.split("-")
+    for piece in pieces:
+      propName += piece[0].upper() + piece[1:]
+    self.propName = propName
+
+    self.template = template
+    self.argPaths = {}
+    self.kwargPaths = {}
+
+    # Pretty sure there's a better way to do this but I'm tired.
+    self.__findArgs(self.template, [])
+
+  def __call__(self, ctx, packet):
+    args = []
+    i = 0
+    while i in self.argPaths:
+      readpath = self.argPaths[i]
+      args.append(readpath(ctx, packet))
+      i += 1
+
+    kwargs = {}
+    for key in self.kwargPaths:
+      kwargs[key] = self.kwargPaths[key](ctx, packet)
+
+    getattr(ctx, self.propName).emit(*args, **kwargs)
+
+  def __findArgs(self, template, path):
+    if isinstance(template, dict) and "_arg" in template:
+      self.argPaths[template["_arg"]] = ReadPath(path, template["type"])
+      return
+
+    if isinstance(template, dict) and "_option" in template:
+      self.kwargPaths[template["_option"]] = ReadPath(path, "nullable:" + template["type"])
+      return
+
+    if isinstance(template, dict):
+      iterable = template.iterkeys()
+    elif isinstance(template, list):
+      iterable = range(0, len(template))
+    else:
+      return
+
+    for key in iterable:
+      path.append(key)
+      ret = self.__findResponse(template[key], path)
+      if ret:
+        return ret
+      path.pop()
+
+class Response(object):
+  """Reads a response packet given a response template."""
+
+  def __init__(self, template):
+    self.readpath = self.__findResponse(template, []) or ReadPath()
+
+  def __call__(self, ctx, packet):
+    return self.readpath(ctx, packet)
+    if self.path == None:
+      return None
+
   def __findResponse(self, template, path):
     if isinstance(template, dict) and "_retval" in template:
-      return (path, template["_retval"])
+      return ReadPath(path, template["_retval"])
     elif isinstance(template, dict):
       iterable = template.iterkeys()
     elif isinstance(template, list):

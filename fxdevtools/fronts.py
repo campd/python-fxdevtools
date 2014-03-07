@@ -35,7 +35,10 @@ class RootFront(Front):
       "name": "actorDescriptions",
       "request": {},
       "response": { "_retval": "json" }
-    }]
+    }],
+    "events": {
+      "tabListChanged": {}
+    }
   }
 
   def __init__(self, conn, packet):
@@ -49,7 +52,7 @@ class TabFront(Front):
   typeName = "tab"
   actorDesc = {
     "typename": "tab",
-    "methods": []
+    "methods": [],
   }
 
   def __init__(self, conn):

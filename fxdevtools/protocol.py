@@ -2,7 +2,7 @@ from twisted.internet.protocol import Protocol, Factory, ClientCreator
 from twisted.internet import reactor, defer
 
 from events import Event
-from marshallers import addType, getType, typeExists, Request, Response, ActorType, DictType, PlaceholderType
+from marshallers import addType, getType, typeExists, Request, Response, ActorType, DictType, PlaceholderType, ProtocolEvent
 
 import json
 
@@ -184,7 +184,7 @@ class FrontMeta(type):
     if "actorDesc" in dct:
       cls.implementActor(dct["actorDesc"])
 
-    return super(FrontMeta, cls).__init__(name, parents, dct)
+    return super(FrontMeta, cls).__init__(name, parents, dct) 
 
 class Front(Pool):
   __metaclass__ = FrontMeta
@@ -197,6 +197,11 @@ class Front(Pool):
     for method in actorDesc["methods"]:
       cls.implementMethod(method)
 
+    if "events" in actorDesc:
+      cls.events = {}
+      for eventName in actorDesc["events"]:
+        cls.implementEvent(eventName, actorDesc["events"][eventName])
+
   @classmethod
   def implementMethod(cls, method):
     name = method["name"]
@@ -204,6 +209,22 @@ class Front(Pool):
     setattr(cls, "method_%s" % (name,), m)
     setattr(cls, "impl_%s" % (name,),
       lambda self, *args, **kwargs: self.request(m, *args, **kwargs))
+
+  @classmethod
+  def implementEvent(cls, name, template):
+    evt = ProtocolEvent(name, template)
+    privName = "_" + evt.propName
+    # Since I'm using event objects, lazily create event objects when they
+    # are asked for.  But maybe it'd be better to use string events instead.
+    def eventGet(self):
+      if not hasattr(self, privName):
+        setattr(self, privName, Event())
+      return getattr(self, privName)
+    def eventSet(self, evt):
+      setattr(self, privName, evt)
+    setattr(cls, evt.propName, property(eventGet, eventSet))
+
+    cls.events[name] = evt
 
   def __init__(self, conn):
     self.conn = conn
@@ -240,6 +261,9 @@ class Front(Pool):
     return d
 
   def onPacket(self, packet):
+    if "type" in packet and packet["type"] in self.events:
+      self.events[packet["type"]](self, packet)
+
     # XXX: pick off event packets
 
     if len(self.requests) == 0:

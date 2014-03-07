@@ -9,8 +9,13 @@ setDebugging(True)
 def done(packet):
   print packet
 
+def tabListChanged():
+  print "tab list changed!"
+
 @defer.deferredGenerator
 def connected(client):
+  client.root.onTabListChanged += tabListChanged
+
   d = defer.waitForDeferred(client.root.echo("hello"))
   yield d
   print "echo result: " + d.getResult()
