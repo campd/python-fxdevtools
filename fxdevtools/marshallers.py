@@ -27,19 +27,6 @@ class Request(object):
 
     return template
 
-class ReadPath(object):
-  def __init__(self, path=None, t=None):
-    if path != None:
-      self.path = [p for p in path]
-    self.type = getType(t)
-
-  def __call__(self, ctx, packet):
-    if self.path == None:
-      return None
-    for p in self.path:
-      packet = packet[p]
-    return self.type.read(packet, ctx)
-
 
 class ProtocolEvent(object):
   def __init__(self, name, template):
@@ -124,6 +111,23 @@ class Response(object):
       path.pop()
     return None
 
+class ReadPath(object):
+  """ Stores a template location for reading from packets."""
+  def __init__(self, path=None, t=None):
+    if path != None:
+      self.path = [p for p in path]
+    self.type = getType(t)
+
+  def __call__(self, ctx, packet):
+    if self.path == None:
+      return None
+    for p in self.path:
+      packet = packet[p]
+    return self.type.read(packet, ctx)
+
+###
+# Type registration and management.
+###
 def getType(t) :
   if t == None:
     return Primitive
@@ -149,8 +153,30 @@ def getType(t) :
   if len(pieces) > 1:
     return addType(ActorDetailType(t, pieces[0], pieces[1]))
 
-  # I think I'm going to regret this.
+  # If this type hasn't been registered yet, add a placeholder type
+  # assuming that the type will be filled in later.  If the type
+  # is actually used before it is registered, it will raise an error.
   return addType(PlaceholderType(t))
+
+
+def addType(t):
+  if t.name in registeredTypes:
+    registered = registeredTypes[t.name]
+    if not isinstance(registered, PlaceholderType) or registered.concrete:
+      raise ValueError("Type %s registered twice!" % (t.name,))
+    registered.concrete = t
+    return registered
+
+  registeredTypes[t.name] = t
+  return t
+
+def typeExists(name):
+  return name in registeredTypes
+
+
+###
+# Individual types
+###
 
 class ProtocolType(object):
   pass
@@ -199,6 +225,7 @@ class ArrayType(ProtocolType):
       return v
     return [self.subtype.write(i, ctx, detail) for i in v]
 
+
 class DictType(ProtocolType):
   def __init__(self, name, specializations):
     self.name = name
@@ -224,6 +251,7 @@ class DictType(ProtocolType):
 
   def write(self, v, ctx=None, detail=None):
     pass
+
 
 class ActorType(ProtocolType):
   def __init__(self, name, cls):
@@ -269,20 +297,6 @@ class PlaceholderType(ProtocolType):
     if not self.concrete:
       raise ValueError("No concrete type registered for %s!" % (self.name,))
     return getattr(self.concrete, name)
-
-def addType(t):
-  if t.name in registeredTypes:
-    registered = registeredTypes[t.name]
-    if not isinstance(registered, PlaceholderType) or registered.concrete:
-      raise ValueError("Type %s registered twice!" % (t.name,))
-    registered.concrete = t
-    return registered
-
-  registeredTypes[t.name] = t
-  return t
-
-def typeExists(name):
-  return name in registeredTypes
 
 Primitive = addType(PrimitiveType("primitive"))
 String = addType(PrimitiveType("string"))
