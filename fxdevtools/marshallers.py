@@ -1,5 +1,8 @@
+"""Protocol types helper classes for reading and writing packets."""
+
 
 registeredTypes = {}
+
 
 class Request(object):
     """Constructs a request packet given a request template."""
@@ -23,7 +26,8 @@ class Request(object):
                 ret[name] = self.__convert(template[name], ctx, args, kwargs)
             return ret
         elif isinstance(template, list) or isinstance(template, tuple):
-            return [self.__convert(item, ctx, args, kwargs) for item in template]
+            return [self.__convert(item, ctx, args, kwargs)
+                    for item in template]
 
         return template
 
@@ -65,7 +69,8 @@ class ProtocolEvent(object):
             return
 
         if isinstance(template, dict) and "_option" in template:
-            self.kwargPaths[template["_option"]] = ReadPath(path, "nullable:" + template["type"])
+            self.kwargPaths[template["_option"]] = \
+                ReadPath(path, "nullable:" + template["type"])
             return
 
         if isinstance(template, dict):
@@ -81,6 +86,7 @@ class ProtocolEvent(object):
             if ret:
                 return ret
             path.pop()
+
 
 class Response(object):
     """Reads a response packet given a response template."""
@@ -111,6 +117,7 @@ class Response(object):
             path.pop()
         return None
 
+
 class ReadPath(object):
     """ Stores a template location for reading from packets."""
     def __init__(self, path=None, t=None):
@@ -125,9 +132,12 @@ class ReadPath(object):
             packet = packet[p]
         return self.type.read(packet, ctx)
 
+
 ###
 # Type registration and management.
 ###
+
+
 def getType(t) :
     if t == None:
         return Primitive
@@ -170,6 +180,7 @@ def addType(t):
     registeredTypes[t.name] = t
     return t
 
+
 def typeExists(name):
     return name in registeredTypes
 
@@ -178,8 +189,10 @@ def typeExists(name):
 # Individual types
 ###
 
+
 class ProtocolType(object):
     pass
+
 
 class PrimitiveType(ProtocolType):
     def __init__(self, name, read=None, write=None):
@@ -195,6 +208,7 @@ class PrimitiveType(ProtocolType):
             raise Error("None passed where a value is required")
         return v
 
+
 class NullableType(ProtocolType):
     def __init__(self, subtype):
         self.subtype = getType(subtype)
@@ -209,6 +223,7 @@ class NullableType(ProtocolType):
         if v == None:
             return v
         return self.subtype.write(v, ctx)
+
 
 class ArrayType(ProtocolType):
     def __init__(self, subtype):
@@ -235,7 +250,8 @@ class DictType(ProtocolType):
         ret = {}
         for prop in v.keys():
             if prop in self.specializations:
-                ret[prop] = getType(self.specializations[prop]).read(v[prop], ctx, detail)
+                specialization = self.specializations[prop]
+                ret[prop] = getType(specialization).read(v[prop], ctx, detail)
             else:
                 ret[prop] = v[prop]
         return ret
@@ -244,7 +260,8 @@ class DictType(ProtocolType):
         ret = {}
         for prop in v.keys():
             if prop in self.specializations:
-                ret[prop] = getType(self.specializations[prop]).write(v[prop], ctx, detail)
+                specialization = self.specializations[prop]
+                ret[prop] = getType(specialization).write(v[prop], ctx, detail)
             else:
                 ret[prop] = v[prop]
         return ret
@@ -277,6 +294,7 @@ class ActorType(ProtocolType):
     def write(self, v, ctx=None, detail=None):
         return v.actorID
 
+
 class ActorDetailType(ProtocolType):
     def __init__(self, actorType, detail):
         self.subtype = getType(actorType)
@@ -288,6 +306,7 @@ class ActorDetailType(ProtocolType):
     def write(self, v, ctx=None):
         return self.subtype.write(v, ctx, self.detail)
 
+
 class PlaceholderType(ProtocolType):
     def __init__(self, name):
         self.name = name
@@ -295,7 +314,8 @@ class PlaceholderType(ProtocolType):
 
     def __getattr__(self, name):
         if not self.concrete:
-            raise ValueError("No concrete type registered for %s!" % (self.name,))
+            raise ValueError(
+                "No concrete type registered for %s!" % (self.name,))
         return getattr(self.concrete, name)
 
 Primitive = addType(PrimitiveType("primitive"))
@@ -303,3 +323,5 @@ String = addType(PrimitiveType("string"))
 Number = addType(PrimitiveType("number"))
 Boolean = addType(PrimitiveType("boolean"))
 JSON = addType(PrimitiveType("json"))
+
+

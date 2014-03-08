@@ -1,10 +1,13 @@
 from twisted.internet.protocol import Protocol, Factory, ClientCreator
 from twisted.internet import reactor, defer
 
-from events import Event
-from marshallers import addType, getType, typeExists, Request, Response, ActorType, DictType, PlaceholderType, ProtocolEvent
-
 import json
+
+from events import Event
+from marshallers import addType, getType, typeExists
+from marshallers import Request, Response, ActorType, DictType
+from marshallers import PlaceholderType, ProtocolEvent
+
 
 class FirefoxDevtoolsProtocol(Protocol):
     def __init__(self):
@@ -15,7 +18,7 @@ class FirefoxDevtoolsProtocol(Protocol):
         self.buffer += data
 
         try:
-            length, remaining = self.buffer.split(':', 1)
+            length, remaining = self.buffer.split(":", 1)
         except ValueError:
             return
 
@@ -98,7 +101,8 @@ class FirefoxDevtoolsClient(object):
                 elif isinstance(t, PlaceholderType) and t.concrete:
                     concrete = t.concrete.cls
                 else:
-                    concrete = type(str(typeName), (Front,), { "typeName": typeName })
+                    concrete = type(
+                        str(typeName), (Front,), {"typeName": typeName})
 
                 concrete.implementActor(desc)
                 continue
@@ -215,7 +219,7 @@ class Front(Pool):
         evt = ProtocolEvent(name, template)
         privName = "_" + evt.propName
         # Since I'm using event objects, lazily create event objects when they
-        # are asked for.  But maybe it'd be better to use string events instead.
+        # are asked for.  But maybe it'd be better to use string events.
         def eventGet(self):
             if not hasattr(self, privName):
                 setattr(self, privName, Event())
@@ -239,7 +243,9 @@ class Front(Pool):
             if hasattr(self, impl):
                 return getattr(self, impl)
 
-        raise AttributeError("'%s' object has no attribute named '%s'" % (self.__class__.__name__, name))
+        raise AttributeError(
+            "'%s' object has no attribute named '%s'" %
+                (self.__class__.__name__, name))
 
     def form(self, form, detail=None):
         pass

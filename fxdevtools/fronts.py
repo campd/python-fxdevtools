@@ -2,8 +2,6 @@
 Front specializations
 """
 
-print "importing fronts"
-
 from protocol import Front, Request
 from marshallers import getType, addType, DictType
 
@@ -17,28 +15,28 @@ print "ABOUT TO CREATE ROOTFRONT"
 class RootFront(Front):
     typeName = "root"
     actorDesc = {
-      "methods": [{
-        "name": "echo",
-        "request": {
-          "string": { "_arg": 0, "type": "string" }
+        "methods": [{
+            "name": "echo",
+            "request": {
+                "string": { "_arg": 0, "type": "string" }
+            },
+            "response": {
+                "string": { "_retval": "string" }
+            }
+          },
+        {
+            "name": "listTabs",
+            "request": {},
+            "response": { "_retval": "tablist" }
         },
-        "response": {
-          "string": { "_retval": "string" }
+        {
+            "name": "actorDescriptions",
+            "request": {},
+            "response": { "_retval": "json" }
+        }],
+        "events": {
+            "tabListChanged": {}
         }
-      },
-      {
-        "name": "listTabs",
-        "request": {},
-        "response": { "_retval": "tablist" }
-      },
-      {
-        "name": "actorDescriptions",
-        "request": {},
-        "response": { "_retval": "json" }
-      }],
-      "events": {
-        "tabListChanged": {}
-      }
     }
 
     def __init__(self, conn, packet):
@@ -51,8 +49,8 @@ print "ABOUT TO CREATE TABFRONT"
 class TabFront(Front):
     typeName = "tab"
     actorDesc = {
-      "typename": "tab",
-      "methods": [],
+        "typename": "tab",
+        "methods": [],
     }
 
     def __init__(self, conn):
