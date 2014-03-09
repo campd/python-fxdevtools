@@ -1,0 +1,27 @@
+<RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:em="http://www.mozilla.org/2004/em-rdf#">
+
+  <Description about="urn:mozilla:install-manifest">
+    <em:id>pydevtools-testrunner@mozilla.com</em:id>
+    <em:version>1.0</em:version>
+    <em:type>2</em:type>
+
+    <!-- Target Application this extension can install into,
+         with minimum and maximum supported versions. -->
+    <em:targetApplication>
+      <Description>
+        <em:id>{ec8030f7-c20a-464f-9b0e-13a3a9e97384}</em:id>
+        <em:minVersion>29.*</em:minVersion>
+        <em:maxVersion>30.*</em:maxVersion>
+      </Description>
+    </em:targetApplication>
+
+    <em:bootstrap>true</em:bootstrap>
+
+    <em:name>pydevtools-testrunner</em:name>
+    <em:description>Holds the test harness for this app</em:description>
+    <em:creator>Dave Camp</em:creator>
+    <em:homepageURL>http://www.example.com/</em:homepageURL>
+</Description>
+
+</RDF>
