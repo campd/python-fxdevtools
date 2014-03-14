@@ -1,5 +1,4 @@
-from twisted.internet.protocol import Protocol, Factory, ClientCreator
-from twisted.internet import reactor, defer
+from twisted.internet import defer
 
 import json
 
@@ -8,33 +7,7 @@ from marshallers import addType, getType, typeExists
 from marshallers import Request, Response, ActorType, DictType
 from marshallers import PlaceholderType, ProtocolEvent
 
-
-class FirefoxDevtoolsProtocol(Protocol):
-    def __init__(self):
-        self.buffer = ""
-        self.onPacket = Event()
-
-    def dataReceived(self, data):
-        self.buffer += data
-
-        try:
-            length, remaining = self.buffer.split(":", 1)
-        except ValueError:
-            return
-
-        length = int(length)
-        if len(remaining) < length:
-            return
-
-        packet = remaining[0:length]
-        self.buffer = remaining[length:]
-        print "got " + packet
-        self.onPacket.emit(json.loads(packet))
-
-    def sendPacket(self, packet):
-        data = json.dumps(packet)
-        print "sending " + data
-        self.transport.write(str(len(data)) + ":" + data)
+import fxconnection
 
 
 class FirefoxDevtoolsClient(object):
@@ -285,8 +258,7 @@ def gotProtocol(p):
     return d
 
 def connect(hostname="localhost", port=6080):
-    creator = ClientCreator(reactor, FirefoxDevtoolsProtocol)
-    d = creator.connectTCP(hostname, port)
+    d = fxconnection.connect(hostname, port)
     d.addCallback(gotProtocol)
     return d
 

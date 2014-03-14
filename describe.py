@@ -1,5 +1,6 @@
-from twisted.internet import reactor, defer
+from twisted.internet import defer
 from fxdevtools.protocol import connect
+from fxdevtools import fxconnection
 
 import pprint
 import sys
@@ -23,4 +24,4 @@ def errback(e):
 
 d.addErrback(errback)
 
-reactor.run()
+fxconnection.loop()

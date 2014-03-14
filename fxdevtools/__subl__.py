@@ -3,23 +3,21 @@ I didn't want to deal with loading semantics and sublreactor needs to
 be imported first, hence the strange naming here.
 """
 
-import sublreactor
-
 import sublime
 import sublime_plugin
-from twisted.internet import reactor, defer
-from twisted.internet.protocol import Protocol, Factory, ClientCreator
-from protocol import connect, FirefoxDevtoolsProtocol, FirefoxDevtoolsClient
-
-
-from twisted.python import log
-import sys
-log.startLogging(sys.stdout)
+from twisted.internet import defer
+from fxconnection import connect, protocol_map
+from async import MainLoop
 
 
 class FirefoxConnection(object):
     def __init__(self):
         self.connected = None
+        self.loop = MainLoop(protocol_map, self.poke)
+
+    def poke(self):
+        print "poking!"
+        sublime.set_timeout(self.loop.process, 0)
 
     def connect(self):
         return defer.maybeDeferred(self._connect)
@@ -31,14 +29,19 @@ class FirefoxConnection(object):
         # XXX: grab port and hostname from settings maybe?
         self.connected = connect()
         self.connected.addCallback(self._connected)
+
+        self.loop.start()
+
         return self.connected
 
     def _connected(self, client):
+        print "setting connected to %s" % (self.client,)
         self.client = client
         self.connected = client
 
     @defer.deferredGenerator
     def chooseTab(self, *args):
+        print "choosing tab!"
         d = defer.waitForDeferred(self.client.root.listTabs())
         yield d
         tabs = d.getResult()
@@ -52,6 +55,7 @@ class FirefoxConnectCommand(sublime_plugin.ApplicationCommand):
         d = connection.connect()
         d.addCallback(connection.chooseTab)
         d.addCallback(self.connected)
+
 
     def connected(self, tab):
         sublime.status_message("Connected to '%s'" % (tab.title,))

@@ -4,9 +4,11 @@ from twisted.internet import defer
 from events import Event
 import json
 
+protocol_map = {}
+
 class FirefoxDevtoolsProtocol(asyncore.dispatcher):
     def __init__(self):
-        asyncore.dispatcher.__init__(self)
+        asyncore.dispatcher.__init__(self, map=protocol_map)
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
         self.recvBuffer = ""
         self.sendBuffer = ""
@@ -57,4 +59,8 @@ def connect(hostname="localhost", port=6080):
     return d
 
 def loop():
-    asyncore.loop()
+    from async import MainLoop
+    l = MainLoop(protocol_map)
+    l.start()
+    l.block()
+

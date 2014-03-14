@@ -1,7 +1,8 @@
-from twisted.internet import reactor, defer
+from twisted.internet import defer
 from twisted.internet.defer import setDebugging
 
 from fxdevtools.protocol import connect
+from fxdevtools import fxconnection
 import json
 
 setDebugging(True)
@@ -36,4 +37,5 @@ def errback(e):
     print "ERROR: %s" % (e,)
 d.addErrback(errback)
 
-reactor.run()
+fxconnection.loop()
+

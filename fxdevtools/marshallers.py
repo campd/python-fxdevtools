@@ -14,6 +14,7 @@ class Request(object):
             self.template["type"] = self.name
 
     def __call__(self, ctx, *args, **kwargs):
+        print "calling %s" % (self.name,)
         return self.__convert(self.template, ctx, args, kwargs)
 
     def __convert(self, template, ctx, args, kwargs):
