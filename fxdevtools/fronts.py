@@ -3,17 +3,17 @@ Front specializations
 """
 
 from protocol import Front, Request
-from marshallers import getType, addType, DictType
+from marshallers import get_type, add_type, DictType
 
-addType(DictType("tablist", {
+add_type(DictType("tablist", {
   "selected": "number",
   "tabs": "array:tab"
 }))
 
 
 class RootFront(Front):
-    typeName = "root"
-    actorDesc = {
+    actor_desc = {
+        "typeName": "root",
         "methods": [{
             "name": "echo",
             "request": {
@@ -39,16 +39,15 @@ class RootFront(Front):
     }
 
     def __init__(self, conn, packet):
-        self.actorID = "root"
+        self.actor_id = "root"
         self.hello = packet
         super(RootFront, self).__init__(conn)
 
 
 print "ABOUT TO CREATE TABFRONT"
 class TabFront(Front):
-    typeName = "tab"
-    actorDesc = {
-        "typename": "tab",
+    actor_desc = {
+        "typeName": "tab",
         "methods": [],
     }
 
@@ -56,8 +55,8 @@ class TabFront(Front):
         self.conn = conn
 
     def form(self, form, detail=None):
-        self.actorID = form["actor"]
-        self.inspector = getType("inspector").read(form["inspectorActor"], self)
+        self.actor_id = form["actor"]
+        self.inspector = get_type("inspector").read(form["inspectorActor"], self)
         for name in form.keys():
             setattr(self, name, form[name])
 

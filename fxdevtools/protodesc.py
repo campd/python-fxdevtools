@@ -1,6 +1,6 @@
 """Pre-prepared actor descriptions for the protocol, for when autodiscovery fails."""
 
-actorDescriptions = {u'from': u'root',
+actor_descriptions = {u'from': u'root',
  u'types': {u'appliedStylesReturn': {u'category': u'dict',
                                      u'specializations': {u'entries': u'array:appliedstyle',
                                                           u'rules': u'array:domstylerule',

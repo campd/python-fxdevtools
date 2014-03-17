@@ -40,9 +40,9 @@ class FirefoxConnection(object):
         self.connected = client
 
     @defer.deferredGenerator
-    def chooseTab(self, *args):
+    def choose_tab(self, *args):
         print "choosing tab!"
-        d = defer.waitForDeferred(self.client.root.listTabs())
+        d = defer.waitForDeferred(self.client.root.list_tabs())
         yield d
         tabs = d.getResult()
         yield tabs["tabs"][tabs["selected"]]
@@ -53,7 +53,7 @@ connection = FirefoxConnection()
 class FirefoxConnectCommand(sublime_plugin.ApplicationCommand):
     def run(self):
         d = connection.connect()
-        d.addCallback(connection.chooseTab)
+        d.addCallback(connection.choose_tab)
         d.addCallback(self.connected)
 
 

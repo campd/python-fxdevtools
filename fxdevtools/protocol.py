@@ -4,7 +4,7 @@ import json
 import re
 
 from events import Event
-from marshallers import addType, getType, typeExists
+from marshallers import add_type, get_type, type_exists
 from marshallers import Request, Response, ActorType, DictType
 from marshallers import PlaceholderType, ProtocolEvent
 
@@ -21,29 +21,29 @@ class FirefoxDevtoolsClient(object):
     def __init__(self, conn):
         self.root = None
         self.conn = conn
-        self.conn.onPacket += self.onPacket
-        self.onConnected = Event()
+        self.conn.on_packet += self.on_packet
+        self.on_connected = Event()
         self.pools = set()
 
-    def addPool(self, pool):
+    def add_pool(self, pool):
         self.pools.add(pool)
 
-    def removePool(self, pool):
+    def remove_pool(self, pool):
         self.pools.discard(pool)
 
-    def poolFor(self, actorID):
+    def pool_for(self, actor_id):
         for pool in self.pools:
-            if pool.hasFront(actorID):
+            if pool.has_front(actor_id):
                 return pool
         return None
 
-    def getFront(self, actorID):
-        pool = self.poolFor(actorID)
+    def get_front(self, actor_id):
+        pool = self.pool_for(actor_id)
         if not pool:
             return None
-        return pool.getFront(actorID)
+        return pool.get_front(actor_id)
 
-    def onPacket(self, packet):
+    def on_packet(self, packet):
         if not self.root:
             # Yeah these should be runtime errors.
             assert packet["from"] == "root"
@@ -53,28 +53,28 @@ class FirefoxDevtoolsClient(object):
             from fronts import RootFront
             self.root = RootFront(self, packet)
             d = self.root.actor_descriptions()
-            d.addCallback(self.registerActorDescriptions)
-            d.addErrback(self.describeFailed)
+            d.addCallback(self.register_actor_descriptions)
+            d.addErrback(self.describe_failed)
             return
 
         if packet["from"] == "root":
             front = self.root
         else:
-            front = self.getFront(packet["from"])
+            front = self.get_front(packet["from"])
 
-        front.onPacket(packet)
+        front.on_packet(packet)
 
-    def describeFailed(self, e):
+    def describe_failed(self, e):
         print "Error listing actor descriptions: %s" % (e,)
         import protodesc
-        self.registerActorDescriptions(protodesc.actorDescriptions)
+        self.register_actor_descriptions(protodesc.actor_descriptions)
 
-    def registerActorDescriptions(self, descriptions):
+    def register_actor_descriptions(self, descriptions):
         for desc in descriptions["types"].values():
-            typeName = desc["typeName"]
+            type_name = desc["typeName"]
             category = desc["category"]
             if category == "actor":
-                t = getType(desc["typeName"])
+                t = get_type(desc["typeName"])
 
                 if isinstance(t, ActorType):
                     concrete = t.cls
@@ -82,30 +82,30 @@ class FirefoxDevtoolsClient(object):
                     concrete = t.concrete.cls
                 else:
                     concrete = type(
-                        str(typeName), (Front,), {"typeName": typeName})
+                        str(type_name), (Front,), {"typeName": type_name})
 
-                concrete.implementActor(desc)
+                concrete.implement_actor(desc)
                 continue
 
-            if typeExists(typeName):
+            if type_exists(type_name):
                 continue
 
             if category == "dict":
-                addType(DictType(typeName, desc["specializations"]))
+                add_type(DictType(type_name, desc["specializations"]))
 
-        self.onConnected.emit(self)
+        self.on_connected.emit(self)
 
-    def sendPacket(self, packet):
-        self.conn.sendPacket(packet)
+    def send_packet(self, packet):
+        self.conn.send_packet(packet)
 
 class Pool(object):
     def __init__(conn):
         self.conn = conn
 
     def parent():
-        return self.conn.poolFor(self.actorID)
+        return self.conn.pool_for(self.actor_id)
 
-    def marshallPool(self):
+    def marshall_pool(self):
         return self
 
     @property
@@ -114,25 +114,25 @@ class Pool(object):
             return self._fronts
         except AttributeError:
             self._fronts = {}
-            self.conn.addPool(self)
+            self.conn.add_pool(self)
             return self._fronts
 
     def manage(self, front):
         """Add an actor as a child of this pool."""
-        self.fronts[front.actorID] = front
+        self.fronts[front.actor_id] = front
 
     def unmanage(self, front):
         """Remove an actor as a child of this pool"""
-        del self.fronts[front.actorID]
+        del self.fronts[front.actor_id]
 
-    def hasFront(self, actorID):
-        return actorID in self.fronts
+    def has_front(self, actor_id):
+        return actor_id in self.fronts
 
     def isEmpty(self):
         return len(self.fronts) == 0
 
-    def getFront(self, actorID):
-        return self.fronts[actorID]
+    def get_front(self, actor_id):
+        return self.fronts[actor_id]
 
     def destroy(self):
         if hasattr(self, "destroyed"):
@@ -148,25 +148,21 @@ class Pool(object):
         for actor in self.fronts.values():
             actor.destroy()
 
-        self.conn.removePool(self)
+        self.conn.remove_pool(self)
         del self._fronts
 
 class Method(object):
-    def __init__(self, name, methodDesc):
+    def __init__(self, name, method_desc):
         self.name = name
-        self.methodDesc = methodDesc
-        self.request = Request(name, methodDesc["request"])
-        self.response = Response(methodDesc["response"])
+        self.method_desc = method_desc
+        self.request = Request(name, method_desc["request"])
+        self.response = Response(method_desc["response"])
 
 class FrontMeta(type):
     def __init__(cls, name, parents, dct):
-        print "registering class " + name
-        if "typeName" in dct:
-            print "adding type " + dct["typeName"]
-            addType(ActorType(dct["typeName"], cls))
-
-        if "actorDesc" in dct:
-            cls.implementActor(dct["actorDesc"])
+        if "actor_desc" in dct:
+            actor_desc = dct["actor_desc"]
+            cls.implement_actor(actor_desc)
 
         return super(FrontMeta, cls).__init__(name, parents, dct)
 
@@ -174,20 +170,23 @@ class Front(Pool):
     __metaclass__ = FrontMeta
 
     @classmethod
-    def implementActor(cls, actorDesc):
-        if isinstance(actorDesc, str) or isinstance(actorDesc, unicode):
-            actorDesc = json.loads(s)
+    def implement_actor(cls, actor_desc):
+        if isinstance(actor_desc, str) or isinstance(actor_desc, unicode):
+            actor_desc = json.loads(s)
 
-        for method in actorDesc["methods"]:
-            cls.implementMethod(method)
+        if "typeName" in actor_desc:
+            add_type(ActorType(actor_desc["typeName"], cls))
 
-        if "events" in actorDesc:
+        for method in actor_desc["methods"]:
+            cls.implement_method(method)
+
+        if "events" in actor_desc:
             cls.events = {}
-            for eventName in actorDesc["events"]:
-                cls.implementEvent(eventName, actorDesc["events"][eventName])
+            for event_name in actor_desc["events"]:
+                cls.implement_event(event_name, actor_desc["events"][event_name])
 
     @classmethod
-    def implementMethod(cls, method):
+    def implement_method(cls, method):
         m = Method(method["name"], method)
         name = decamel(method["name"])
 
@@ -196,18 +195,19 @@ class Front(Pool):
           lambda self, *args, **kwargs: self.request(m, *args, **kwargs))
 
     @classmethod
-    def implementEvent(cls, name, template):
-        evt = ProtocolEvent(name, template)
-        privName = "_" + evt.propName
+    def implement_event(cls, name, template):
+        prop_name = "on_" + decamel(name)
+        evt = ProtocolEvent(prop_name, template)
+        priv_name = "_" + prop_name
         # Since I'm using event objects, lazily create event objects when they
         # are asked for.  But maybe it'd be better to use string events.
-        def eventGet(self):
-            if not hasattr(self, privName):
-                setattr(self, privName, Event())
-            return getattr(self, privName)
-        def eventSet(self, evt):
-            setattr(self, privName, evt)
-        setattr(cls, evt.propName, property(eventGet, eventSet))
+        def event_get(self):
+            if not hasattr(self, priv_name):
+                setattr(self, priv_name, Event())
+            return getattr(self, priv_name)
+        def event_set(self, evt):
+            setattr(self, priv_name, evt)
+        setattr(cls, prop_name, property(event_get, event_set))
 
         cls.events[name] = evt
 
@@ -233,21 +233,21 @@ class Front(Pool):
 
     def request(self, method, *args, **kwargs):
         packet = method.request(self, *args, **kwargs)
-        packet["to"] = self.actorID
-        self.conn.sendPacket(packet)
+        packet["to"] = self.actor_id
+        self.conn.send_packet(packet)
 
         d = defer.Deferred()
-        def finish(responsePacket):
-            if "error" in responsePacket:
-                d.errback(responsePacket)
+        def finish(response_packet):
+            if "error" in response_packet:
+                d.errback(response_packet)
                 return
 
-            d.callback(method.response(self, responsePacket))
+            d.callback(method.response(self, response_packet))
         self.requests.append(finish)
 
         return d
 
-    def onPacket(self, packet):
+    def on_packet(self, packet):
         if "type" in packet and packet["type"] in self.events:
             self.events[packet["type"]](self, packet)
 
@@ -262,7 +262,7 @@ class Front(Pool):
 def gotProtocol(p):
     d = defer.Deferred()
     client = FirefoxDevtoolsClient(p)
-    client.onConnected += lambda _: d.callback(client)
+    client.on_connected += lambda _: d.callback(client)
     return d
 
 def connect(hostname="localhost", port=6080):
