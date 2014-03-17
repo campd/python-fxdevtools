@@ -157,6 +157,7 @@ class Method(object):
         self.method_desc = method_desc
         self.request = Request(name, method_desc["request"])
         self.response = Response(method_desc["response"])
+        self.oneway = getattr(method_desc, "oneway", False)
 
 class FrontMeta(type):
     def __init__(cls, name, parents, dct):
@@ -235,6 +236,9 @@ class Front(Pool):
         packet = method.request(self, *args, **kwargs)
         packet["to"] = self.actor_id
         self.conn.send_packet(packet)
+
+        if method.oneway:
+            return
 
         d = defer.Deferred()
         def finish(response_packet):
