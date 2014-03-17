@@ -1,6 +1,7 @@
 from twisted.internet import defer
 
 import json
+import re
 
 from events import Event
 from marshallers import addType, getType, typeExists
@@ -8,6 +9,12 @@ from marshallers import Request, Response, ActorType, DictType
 from marshallers import PlaceholderType, ProtocolEvent
 
 import fxconnection
+
+
+# Return a python_style_method_name from a protocolStyleMethodName
+def decamel(name):
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
 class FirefoxDevtoolsClient(object):
@@ -45,7 +52,7 @@ class FirefoxDevtoolsClient(object):
 
             from fronts import RootFront
             self.root = RootFront(self, packet)
-            d = self.root.actorDescriptions()
+            d = self.root.actor_descriptions()
             d.addCallback(self.registerActorDescriptions)
             d.addErrback(self.describeFailed)
             return
@@ -181,8 +188,9 @@ class Front(Pool):
 
     @classmethod
     def implementMethod(cls, method):
-        name = method["name"]
-        m = Method(name, method)
+        m = Method(method["name"], method)
+        name = decamel(method["name"])
+
         setattr(cls, "method_%s" % (name,), m)
         setattr(cls, "impl_%s" % (name,),
           lambda self, *args, **kwargs: self.request(m, *args, **kwargs))

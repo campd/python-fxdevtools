@@ -20,12 +20,12 @@ def connected(client):
     d = defer.waitForDeferred(client.root.echo("hello"))
     yield d
     print "echo result: " + d.getResult()
-    d = defer.waitForDeferred(client.root.listTabs())
+    d = defer.waitForDeferred(client.root.list_tabs())
     yield d
 
     tabs = d.getResult()
 
-    d = defer.waitForDeferred(tabs["tabs"][tabs["selected"]].inspector.getWalker())
+    d = defer.waitForDeferred(tabs["tabs"][tabs["selected"]].inspector.get_walker())
     yield d
     print "walker: %s" % (d.getResult(),)
 

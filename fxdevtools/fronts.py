@@ -11,7 +11,6 @@ addType(DictType("tablist", {
 }))
 
 
-print "ABOUT TO CREATE ROOTFRONT"
 class RootFront(Front):
     typeName = "root"
     actorDesc = {
