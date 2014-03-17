@@ -158,6 +158,7 @@ class Method(object):
         self.request = Request(name, method_desc["request"])
         self.response = Response(method_desc["response"])
         self.oneway = getattr(method_desc, "oneway", False)
+        self.release = getattr(method_desc, "release", False)
 
 class FrontMeta(type):
     def __init__(cls, name, parents, dct):
@@ -247,6 +248,10 @@ class Front(Pool):
                 return
 
             d.callback(method.response(self, response_packet))
+
+            if method.release:
+                self.destroy()
+
         self.requests.append(finish)
 
         return d
