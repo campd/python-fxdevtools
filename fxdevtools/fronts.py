@@ -29,7 +29,7 @@ class RootFront(Front):
             "response": { "_retval": "tablist" }
         },
         {
-            "name": "actorDescriptions",
+            "name": "protocolDescription",
             "request": {},
             "response": { "_retval": "json" }
         }],
@@ -44,7 +44,6 @@ class RootFront(Front):
         super(RootFront, self).__init__(conn)
 
 
-print "ABOUT TO CREATE TABFRONT"
 class TabFront(Front):
     actor_desc = {
         "typeName": "tab",

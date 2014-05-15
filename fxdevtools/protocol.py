@@ -14,6 +14,7 @@ import fxconnection
 # Return a python_style_method_name from a protocolStyleMethodName
 def decamel(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    s1 = re.sub('\-', '_', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
 
@@ -52,7 +53,7 @@ class FirefoxDevtoolsClient(object):
 
             from fronts import RootFront
             self.root = RootFront(self, packet)
-            d = self.root.actor_descriptions()
+            d = self.root.protocol_description()
             d.addCallback(self.register_actor_descriptions)
             d.addErrback(self.describe_failed)
             return
@@ -67,7 +68,7 @@ class FirefoxDevtoolsClient(object):
     def describe_failed(self, e):
         print "Error listing actor descriptions: %s" % (e,)
         import protodesc
-        self.register_actor_descriptions(protodesc.actor_descriptions)
+        #self.register_actor_descriptions(protodesc.actor_descriptions)
 
     def register_actor_descriptions(self, descriptions):
         for desc in descriptions["types"].values():
@@ -199,6 +200,9 @@ class Front(Pool):
     @classmethod
     def implement_event(cls, name, template):
         prop_name = "on_" + decamel(name)
+        print "implementing event: %s" % (name,)
+        print json.dumps(template)
+        print "name: %s" % (prop_name,)
         evt = ProtocolEvent(prop_name, template)
         priv_name = "_" + prop_name
         # Since I'm using event objects, lazily create event objects when they

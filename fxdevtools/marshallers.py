@@ -69,6 +69,7 @@ class ProtocolEvent(object):
             return
 
         if isinstance(template, dict):
+            print "it's a dict"
             iterable = template.iterkeys()
         elif isinstance(template, list):
             iterable = range(0, len(template))
@@ -76,8 +77,9 @@ class ProtocolEvent(object):
             return
 
         for key in iterable:
+            print "looking for %s" % (key,)
             path.append(key)
-            ret = self.__find_response(template[key], path)
+            ret = self.__find_args(template[key], path)
             if ret:
                 return ret
             path.pop()

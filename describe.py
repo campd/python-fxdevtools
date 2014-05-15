@@ -7,14 +7,14 @@ import sys
 
 @defer.deferredGenerator
 def connected(client):
-    d = defer.waitForDeferred(client.root.actorDescriptions())
+    d = defer.waitForDeferred(client.root.protocol_description())
     yield d
     data = d.getResult()
 
     print "\"\"\"Pre-prepared actor descriptions for the protocol, for when autodiscovery fails.\"\"\""
     print ""
     print "actorDescriptions = %s" % (pprint.pformat(data),)
-    reactor.stop()
+    fxconnection
 
 d = connect()
 d.addCallback(connected)
